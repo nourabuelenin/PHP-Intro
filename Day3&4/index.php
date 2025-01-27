@@ -1,10 +1,22 @@
 <?php
 session_start();
+define('PRIVATE_KEY', 'your_private_key_here');
 
 // Redirect to welcome page if already logged in
 if (isset($_SESSION['user'])) {
     header("Location: welcome.php");
     exit();
+}
+
+// Custom hashing function
+function custom_hash($password, $salt) {
+    $combined = $password . $salt . PRIVATE_KEY;
+    return hash('sha256', $combined);
+}
+
+// Generate a unique salt
+function generate_salt() {
+    return bin2hex(random_bytes(16));
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -38,10 +50,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             die("Only image files are allowed.");
         }
 
-        move_uploaded_file($profile_picture['tmp_name'], "uploads/" . $profile_picture['name']);
+        // Move uploaded file to uploads directory
+        $profile_picture_path = "uploads/" . basename($profile_picture['name']);
+        move_uploaded_file($profile_picture['tmp_name'], $profile_picture_path);
 
-        // Save user data
-        $user_data = implode(",", [$name, $email, $password, $room]) . "\n";
+        // Generate a unique salt for the user
+        $salt = generate_salt();
+
+        // Hash the password using the custom hashing function
+        $hashed_password = custom_hash($password, $salt);
+
+        // Save user data including salt and hashed password
+        $user_data = implode(",", [$name, $email, $hashed_password, $salt, $room, $profile_picture['name']]) . "\n";
         file_put_contents("users.txt", $user_data, FILE_APPEND);
         echo "Registration successful! <a href='index.php?action=login'>Login here</a>";
     }
@@ -49,18 +69,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_POST['login'])) {
         $email = $_POST['email'];
         $password = $_POST['password'];
-
-        $users = file("users.txt", FILE_IGNORE_NEW_LINES);
-        foreach ($users as $user) {
-            list($name, $stored_email, $stored_password, $room) = explode(",", $user);
-            if ($email == $stored_email && $password == trim($stored_password)) {
-                $_SESSION['user'] = $name;
+    
+        // Retrieve user data from the database
+        $sql = "SELECT * FROM users WHERE email = '$email'";
+        $result = mysqli_query($connection, $sql);
+    
+        if (mysqli_num_rows($result) == 1) {
+            $user = mysqli_fetch_assoc($result);
+            $hashed_password = custom_hash($password, $user['salt']);
+    
+            // Compare the hashed passwords
+            if ($hashed_password === $user['password']) {
+                $_SESSION['user'] = $user['name'];
+                $_SESSION['email'] = $user['email']; // Store the email in the session
+                $_SESSION['profile_picture'] = $user['profile_picture'];
                 header("Location: welcome.php");
                 exit();
             }
         }
         echo "Invalid login credentials.";
     }
+    
 }
 ?>
 
