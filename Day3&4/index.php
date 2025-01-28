@@ -21,6 +21,9 @@ function generate_salt() {
     return bin2hex(random_bytes(16));
 }
 
+// require "handlers/registerHandler.php";
+// require "handlers/loginHandler.php";
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_POST['register'])) {
         $name = $_POST['name'];
@@ -135,8 +138,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body>
 
 <?php if (isset($_GET['action']) && $_GET['action'] == "login"): ?>
-    <h2>Login</h2>
     <form method="post">
+    <h2>Login</h2>
+
         <label>Email:</label>
         <input type="email" name="email" required><br><br>
 
@@ -144,13 +148,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <input type="password" name="password" required><br><br>
 
         <button type="submit" name="login">Login</button>
+        <a href="index.php">Register here</a>
+
     </form>
-    <a href="index.php">Register here</a>
 
 <?php else: ?>
-    <h2>Add User</h2>
     <form action="index.php" method="post" enctype="multipart/form-data">
-        <label>Name:</label>
+    <h2>Add User</h2>
+    
+    <label>Name:</label>
         <input type="text" name="name" required><br><br>
 
         <label>Email:</label>
@@ -174,8 +180,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         <button type="submit" name="register">Save</button>
         <button type="reset">Reset</button>
+        <a href="index.php?action=login">Already have an account? Login here</a>
+
     </form>
-    <a href="index.php?action=login">Already have an account? Login here</a>
 <?php endif; ?>
 
 </body>
