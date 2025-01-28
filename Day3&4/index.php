@@ -1,10 +1,24 @@
 <?php
 session_start();
+require_once 'database.php';
+
+define('PRIVATE_KEY', 'your_private_key_here');
 
 // Redirect to welcome page if already logged in
 if (isset($_SESSION['user'])) {
     header("Location: welcome.php");
     exit();
+}
+
+// Custom hashing function
+function custom_hash($password, $salt) {
+    $combined = $password . $salt . PRIVATE_KEY;
+    return hash('sha256', $combined);
+}
+
+// Generate a unique salt
+function generate_salt() {
+    return bin2hex(random_bytes(16));
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -15,7 +29,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $confirm_password = $_POST['confirm_password'];
         $room = $_POST['room'];
         $profile_picture = $_FILES['profile_picture'];
-
         // Email validation (2 ways)
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match("/^[\w]+@[\w]+\.[a-z]{2,4}$/", $email)) {
             die("Invalid email format.");
@@ -29,6 +42,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($password !== $confirm_password) {
             die("Passwords do not match.");
         }
+        
+        // Generate a unique salt for the user
+        $salt = generate_salt();
+
+        // Hash the password using the custom hashing function
+        $hashed_password = custom_hash($password, $salt);
 
         // Validate profile picture
         $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
@@ -38,28 +57,56 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             die("Only image files are allowed.");
         }
 
-        move_uploaded_file($profile_picture['tmp_name'], "uploads/" . $profile_picture['name']);
-
-        // Save user data
-        $user_data = implode(",", [$name, $email, $password, $room]) . "\n";
-        file_put_contents("users.txt", $user_data, FILE_APPEND);
-        echo "Registration successful! <a href='index.php?action=login'>Login here</a>";
+        // Handle file upload
+        $target_dir = "uploads/";
+        $target_file = $target_dir . basename($profile_picture["name"]);
+        if (move_uploaded_file($profile_picture["tmp_name"], $target_file)) {
+            // File uploaded successfully
+        } else {
+            echo "Sorry, there was an error uploading your file.";
+            exit();
+        }
+    
+        // Save user data to the database
+        $profile_picture_name = $profile_picture['name'];
+        $query = "INSERT INTO users (name, email, password, salt, room, profile_picture) VALUES (?, ?, ?, ?, ?, ?)";
+        $stmt = $connection->prepare($query);
+        $stmt->bind_param("ssssss", $name, $email, $hashed_password, $salt, $room, $profile_picture_name);
+        $stmt->execute();
+    
+        if ($stmt->affected_rows > 0) {
+            echo "Registration successful! <a href='index.php?action=login'>Login here</a>";
+        } else {
+            echo "Registration failed.";
+        }
+        $stmt->close();
     }
 
     if (isset($_POST['login'])) {
         $email = $_POST['email'];
         $password = $_POST['password'];
 
-        $users = file("users.txt", FILE_IGNORE_NEW_LINES);
-        foreach ($users as $user) {
-            list($name, $stored_email, $stored_password, $room) = explode(",", $user);
-            if ($email == $stored_email && $password == trim($stored_password)) {
+        $query = "SELECT name, password, salt, profile_picture FROM users WHERE email = ?";
+        $stmt = $connection->prepare($query);
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $stmt->store_result();
+        $stmt->bind_result($name, $stored_password, $salt, $profile_picture);
+
+        if ($stmt->fetch()) {
+            // Hash the entered password using the stored salt
+            $hashed_password = custom_hash($password, $salt);
+
+            // Compare the hashed passwords
+            if ($hashed_password === $stored_password) {
                 $_SESSION['user'] = $name;
+                $_SESSION['profile_picture'] = "uploads/" . $profile_picture;
                 header("Location: welcome.php");
                 exit();
             }
         }
         echo "Invalid login credentials.";
+        $stmt->close();
     }
 }
 ?>
