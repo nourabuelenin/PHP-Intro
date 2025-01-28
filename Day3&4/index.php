@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'database.php';
+require 'database.php';
 
 define('PRIVATE_KEY', 'your_private_key_here');
 
@@ -29,6 +29,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $confirm_password = $_POST['confirm_password'];
         $room = $_POST['room'];
         $profile_picture = $_FILES['profile_picture'];
+
         // Email validation (2 ways)
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match("/^[\w]+@[\w]+\.[a-z]{2,4}$/", $email)) {
             die("Invalid email format.");
@@ -57,9 +58,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             die("Only image files are allowed.");
         }
 
+        // Move uploaded file to uploads directory
         // Handle file upload
         $target_dir = "uploads/";
         $target_file = $target_dir . basename($profile_picture["name"]);
+
         if (move_uploaded_file($profile_picture["tmp_name"], $target_file)) {
             // File uploaded successfully
         } else {
@@ -100,7 +103,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // Compare the hashed passwords
             if ($hashed_password === $stored_password) {
                 $_SESSION['user'] = $name;
+                $_SESSION['email'] = $email;
                 $_SESSION['profile_picture'] = "uploads/" . $profile_picture;
+
+                // Redirect to admin.php if the email is admin@gmail.com
+                if ($email === 'admin@gmail.com') {
+                    $_SESSION['admin'] = $name;
+                    header("Location: admin.php");
+                    exit();
+                }
+
+                // Otherwise, redirect to welcome.php
                 header("Location: welcome.php");
                 exit();
             }
@@ -116,6 +129,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
     <title>User System</title>
 </head>
 <body>
