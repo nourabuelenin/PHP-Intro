@@ -21,9 +21,6 @@ function generate_salt() {
     return bin2hex(random_bytes(16));
 }
 
-// require "handlers/registerHandler.php";
-// require "handlers/loginHandler.php";
-
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_POST['register'])) {
         $name = $_POST['name'];
@@ -62,7 +59,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Move uploaded file to uploads directory
-        // Handle file upload
         $target_dir = "uploads/";
         $target_file = $target_dir . basename($profile_picture["name"]);
 
@@ -75,43 +71,43 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
         // Save user data to the database
         $profile_picture_name = $profile_picture['name'];
-        $query = "INSERT INTO users (name, email, password, salt, room, profile_picture) VALUES (?, ?, ?, ?, ?, ?)";
-        $stmt = $connection->prepare($query);
-        $stmt->bind_param("ssssss", $name, $email, $hashed_password, $salt, $room, $profile_picture_name);
-        $stmt->execute();
-    
-        if ($stmt->affected_rows > 0) {
+        $columns = ['name', 'email', 'password', 'salt', 'room', 'profile_picture'];
+        $values = [$name, $email, $hashed_password, $salt, $room, $profile_picture_name];
+
+        if ($db->insert('users', $columns, $values)) {
             echo "Registration successful! <a href='index.php?action=login'>Login here</a>";
         } else {
             echo "Registration failed.";
         }
-        $stmt->close();
     }
+
+    // require "handlers/registerHandler.php";
+    // require "handlers/loginHandler.php";
 
     if (isset($_POST['login'])) {
         $email = $_POST['email'];
         $password = $_POST['password'];
 
-        $query = "SELECT name, password, salt, profile_picture FROM users WHERE email = ?";
-        $stmt = $connection->prepare($query);
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $stmt->store_result();
-        $stmt->bind_result($name, $stored_password, $salt, $profile_picture);
+        $result = $db->select('users', 'name, password, salt, profile_picture', "email = '$email'");
 
-        if ($stmt->fetch()) {
+        if (!empty($result)) {
+            $row = $result[0];
+            $stored_password = $row['password'];
+            $salt = $row['salt'];
+            $profile_picture = $row['profile_picture'];
+
             // Hash the entered password using the stored salt
             $hashed_password = custom_hash($password, $salt);
 
             // Compare the hashed passwords
             if ($hashed_password === $stored_password) {
-                $_SESSION['user'] = $name;
+                $_SESSION['user'] = $row['name'];
                 $_SESSION['email'] = $email;
                 $_SESSION['profile_picture'] = "uploads/" . $profile_picture;
 
                 // Redirect to admin.php if the email is admin@gmail.com
                 if ($email === 'admin@gmail.com') {
-                    $_SESSION['admin'] = $name;
+                    $_SESSION['admin'] = $row['name'];
                     header("Location: admin.php");
                     exit();
                 }
@@ -122,7 +118,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         echo "Invalid login credentials.";
-        $stmt->close();
     }
 }
 ?>

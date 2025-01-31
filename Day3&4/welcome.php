@@ -12,20 +12,14 @@ if (!isset($_SESSION['user'])) {
 $logged_in_user = $_SESSION['user'];
 
 // Query the database to find the user's profile picture URL
-$query = "SELECT profile_picture FROM users WHERE name = ?";
-$stmt = $connection->prepare($query);
-$stmt->bind_param("s", $logged_in_user);
-$stmt->execute();
-$stmt->store_result();
-$stmt->bind_result($profile_picture);
+$result = $db->select('users', 'profile_picture', "name = '$logged_in_user'");
 
-if ($stmt->fetch()) {
-    // Construct the full path to the profile picture
+if (!empty($result)) {
+    $profile_picture = $result[0]['profile_picture'];
     $profile_picture_path = "uploads/" . $profile_picture;
 } else {
     die("User not found.");
 }
-$stmt->close();
 ?>
 
 <!DOCTYPE html>

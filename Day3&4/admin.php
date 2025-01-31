@@ -10,47 +10,31 @@ if (!isset($_SESSION['admin'])) {
 
 // Handle Delete User
 if (isset($_GET['delete_id'])) {
-    $delete_id = $_GET['delete_id'];
-    $query = "DELETE FROM users WHERE id = ?";
-    $stmt = $connection->prepare($query);
-    $stmt->bind_param("i", $delete_id);
-    $stmt->execute();
-
-    if ($stmt->affected_rows > 0) {
+    if ($db->delete('users', $_GET['delete_id'])) {
         echo "<p>User deleted successfully!</p>";
     } else {
         echo "<p>Failed to delete user.</p>";
     }
-    $stmt->close();
 }
 
 // Handle Edit User
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['edit_user'])) {
     $id = $_POST['id'];
-    $name = $_POST['name'];
-    $email = $_POST['email'];
-    $room = $_POST['room'];
+    $fields = [
+        'name' => $_POST['name'],
+        'email' => $_POST['email'],
+        'room' => $_POST['room']
+    ];
 
-    $query = "UPDATE users SET name = ?, email = ?, room = ? WHERE id = ?";
-    $stmt = $connection->prepare($query);
-    $stmt->bind_param("sssi", $name, $email, $room, $id);
-    $stmt->execute();
-
-    if ($stmt->affected_rows > 0) {
+    if ($db->update('users', $id, $fields)) {
         echo "<p>User updated successfully!</p>";
     } else {
         echo "<p>Failed to update user.</p>";
     }
-    $stmt->close();
 }
 
 // Fetch all users from the database
-$query = "SELECT id, name, email, room, profile_picture FROM users";
-$result = $connection->query($query);
-
-if (!$result) {
-    die("Error fetching users: " . $connection->error);
-}
+$users = $db->select('users', 'id, name, email, room, profile_picture');
 ?>
 
 <!DOCTYPE html>
@@ -100,7 +84,7 @@ if (!$result) {
         </tr>
     </thead>
     <tbody>
-        <?php while ($row = $result->fetch_assoc()): ?>
+        <?php foreach ($users as $row): ?>
             <tr>
                 <td><?php echo htmlspecialchars($row['id']); ?></td>
                 <td><?php echo htmlspecialchars($row['name']); ?></td>
@@ -137,7 +121,7 @@ if (!$result) {
                     </form>
                 </td>
             </tr>
-        <?php endwhile; ?>
+        <?php endforeach; ?>
     </tbody>
 </table>
 
